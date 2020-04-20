@@ -1,5 +1,5 @@
 # eko
-CLI app built using golang for pinging ipv4 addresses Library used: Cobra net (for icmp and ipv4)
+CLI app built using golang for pinging ipv4 and ipv6 addresses Library used: Cobra, net (for icmp,ipv4,ipv6)
 
 Usage: go install eko (in the folder)
 Works only as root due to web socket permissions, to run as admin : sudo -s 
