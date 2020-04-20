@@ -1,42 +1,132 @@
-/*
-Copyright © 2020 NAME HERE <EMAIL ADDRESS>
 
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-*/
 package cmd
 
 import (
 	"fmt"
+	"time"
+    "os"
+    "log"
+    "net"
 
+	"golang.org/x/net/icmp"
+	"golang.org/x/net/ipv6"
 	"github.com/spf13/cobra"
 )
 
+var dest6 string
+var packetsRecv6 int
+var packetsSent6 int
+var packetLoss6 float64
+
 // pingip6Cmd represents the pingip6 command
+const (
+	// as iana import was forbidden
+    ProtocolIcmp6 = 58
+)
+// ListenTo to listen on all IPv6 interfaces
+var ListenTo = "::"
+
+// Ping6 Function to ping ipv6 address only
+func Ping6(addr string) (net.IP,*net.IPAddr, time.Duration,  float64, error) {
+	// Get own device IP for origin IP
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+    // Listen for icmp reply
+    c, err := icmp.ListenPacket("ip6:ipv6-icmp", ListenTo)
+    if err != nil {
+        return localAddr.IP,nil, 0, 0, err
+    }
+    defer c.Close()
+
+    // Resolution incase Dns is use for ip
+    dest6, err := net.ResolveIPAddr("ip6:ipv6-icmp", addr)
+    if err != nil {
+        panic(err)
+        return localAddr.IP,nil, 0, 0, err
+    }
+
+    // Forming icmp message and formatting properly using marshal
+    mes := icmp.Message{
+        Type: ipv6.ICMPTypeEchoRequest, Code: 0,
+        Body: &icmp.Echo{
+            ID: os.Getpid() & 0xffff, Seq: 1,
+            Data: []byte(""),
+        },
+    }
+    bytes, err := mes.Marshal(nil)
+    if err != nil {
+        return localAddr.IP,dest6, 0, 0, err
+    }
+
+    // Transmit packet to destination
+    start := time.Now()  //start time is recorded so can be used to get rtt
+    n, err := c.WriteTo(bytes, dest6)
+    packetsSent6++         //packetsent count for calculating loss of packets
+    if err != nil {
+        return localAddr.IP,dest6, 0, 0, err
+    } else if n != len(bytes) {
+        return localAddr.IP,dest6, 0, 0,fmt.Errorf("got %v; want %v", n, len(bytes))
+    }
+
+    // Listen for reply from destination
+    reply := make([]byte, 1500)
+    err = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+    if err != nil {
+        return localAddr.IP,dest6, 0, 0, err
+    }
+    n, peer, err := c.ReadFrom(reply)
+    packetsRecv6++          //packetrecv count for calculating loss
+    if err != nil {
+        return localAddr.IP,dest6, 0, 0, err
+    }
+    rtt := time.Since(start)  //rtt calculated
+        
+    loss := float64(packetsSent6-packetsRecv6) / float64(packetsSent6) * 100 // loss calculation
+	
+	//process the message
+    rm, err := icmp.ParseMessage(ProtocolIcmp6, reply[:n])
+    if err != nil {
+        return localAddr.IP,dest6, 0, 0, err
+    }
+    switch rm.Type {
+    case ipv6.ICMPTypeEchoReply:
+        return localAddr.IP,dest6, rtt, loss, nil
+    default:
+        return localAddr.IP,dest6, 0, loss, fmt.Errorf("got %+v from %v; want echo reply", rm, peer)
+    }
+}
+
 var pingip6Cmd = &cobra.Command{
 	Use:   "pingip6",
-	Short: "A brief description of your command",
-	Long: `A longer description that spans multiple lines and likely contains examples
-and usage of using your command. For example:
-
-Cobra is a CLI library for Go that empowers applications.
-This application is a tool to generate the needed files
-to quickly create a Cobra application.`,
+	Short: "Use this to ping ipv6 address",
+    Long: `Use this with flag -6 to ping an ipv6 address
+    For Example :
+    eko pingip6 -6 google.com
+    `,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("pingip6 called")
+			p := func(addr string){
+			or, dest6, dur,loss ,err := Ping6(addr) //call ping
+			if err != nil {
+				log.Printf("Ping %s (%s): %s\n", addr, dest6, err)
+				return
+			}
+			log.Printf("Ping from %s to %s resolved to %s : Rtt is %s and loss is %f \n",or, addr, dest6, dur, loss)
+		}
+		
+		for true{
+			p(dest6) //infinite loop until terminated with 2 second delay
+			time.Sleep(2 * time.Second)
+		}
 	},
 }
 
 func init() {
+    // packetsRecv6= 10
+    // packetsSent6= 10
 	rootCmd.AddCommand(pingip6Cmd)
 
 	// Here you will define your flags and configuration settings.
@@ -47,5 +137,6 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// pingip6Cmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	// pingip6Cmd.Flags().StringVarP(&dest6, "6", "", "Help message for toggle")
+	pingip6Cmd.Flags().StringVarP(&dest6, "ipv6", "6", "", "Enter ipv6 address to ping") //ipv6 flag
 }
