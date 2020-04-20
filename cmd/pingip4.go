@@ -105,7 +105,7 @@ var pingip4Cmd = &cobra.Command{
 	Short: "Use this to ping ipv4 address",
     Long: `Use this with flag -4 to ping an ipv4 address
     For Example :
-    eko pingip4 -4 8.8.8.8
+    eko pingip4 -4 google.com or pingip4 -4 (ipv4 address)
     `,
 	Run: func(cmd *cobra.Command, args []string) {
 			p := func(addr string){
@@ -114,7 +114,7 @@ var pingip4Cmd = &cobra.Command{
 				log.Printf("Ping %s (%s): %s\n", addr, dest, err)
 				return
 			}
-			log.Printf("Ping from %s to %s resolved to %s : Rtt is %s and loss is %f \n",or, addr, dest, dur, loss)
+			log.Printf("Ping from %s to %s resolved to %s : Rtt: %s loss: %f percent \n",or, addr, dest, dur, loss)
 		}
 		
 		for true{

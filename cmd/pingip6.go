@@ -105,7 +105,7 @@ var pingip6Cmd = &cobra.Command{
 	Short: "Use this to ping ipv6 address",
     Long: `Use this with flag -6 to ping an ipv6 address
     For Example :
-    eko pingip6 -6 google.com
+    eko pingip6 -6 google.com or eko pingip6 -6 (ipv6 address)
     `,
 	Run: func(cmd *cobra.Command, args []string) {
 			p := func(addr string){
@@ -114,7 +114,7 @@ var pingip6Cmd = &cobra.Command{
 				log.Printf("Ping %s (%s): %s\n", addr, dest6, err)
 				return
 			}
-			log.Printf("Ping from %s to %s resolved to %s : Rtt is %s and loss is %f \n",or, addr, dest6, dur, loss)
+			log.Printf("Ping from %s to %s resolved to %s : Rtt: %s loss: %f percent \n",or, addr, dest6, dur, loss)
 		}
 		
 		for true{
