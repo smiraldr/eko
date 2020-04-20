@@ -6,4 +6,7 @@ Works only as root due to web socket permissions, to run as admin : sudo -s
 
 on terminal eko --help for further usage.
 
+example ping
+eko pingip4 -4 google.com
+
 Adding ipv6 support soon ! Check back
